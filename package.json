@@ -1,0 +1,27 @@
+{
+  "name": "is-leap-second",
+  "version": "0.0.1",
+  "description": "Provides a basic check whether an RFC 3339 timestamp is a leap second",
+  "type": "module",
+  "files": [
+    "index.js",
+    "lib",
+    "dist/**/*.d.ts"
+  ],
+  "exports": {
+    "import": "./index.js",
+    "types": "./dist/index.d.ts"
+  },
+  "scripts": {
+    "test": "prettier --check . && tsc -b . && c8 node --test",
+    "update-leap-seconds": "node scripts/update.ts",
+    "prepublishOnly": "tsc -b tsconfig.src.json"
+  },
+  "license": "Apache-2.0",
+  "devDependencies": {
+    "@types/node": "^25.7.0",
+    "c8": "^11.0.0",
+    "prettier": "^3.8.3",
+    "typescript": "^6.0.3"
+  }
+}

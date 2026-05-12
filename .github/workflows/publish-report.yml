@@ -1,0 +1,42 @@
+name: 'Test Report'
+on:
+  workflow_run:
+    workflows: ['Run Tests']
+    types:
+      - completed
+permissions:
+  contents: read
+  actions: read
+  checks: write
+  pull-requests: write
+jobs:
+  report:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        #
+        # The coverage information is reported for the latest nodejs version
+        # only.
+        #
+
+        node-version: [24.x]
+
+    steps:
+      - name: Download workflow artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: test-results-${{ matrix.node-version }}
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Set pr number env
+        run: |
+          PR_NUMBER=$(cat pr_number)
+          echo "PR_NUMBER=$PR_NUMBER" >> $GITHUB_ENV
+
+      - name: c8 coverage report
+
+        uses: Nef10/lcov-reporter-action@v0.4.0
+        with:
+          pr-number: ${{ env.PR_NUMBER }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
