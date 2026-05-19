@@ -38,6 +38,37 @@ otherwise.
 
 **Throws** `TypeError` if `timestamp` is not a string.
 
+### `toTime(timestamp)`
+
+Converts an RFC 3339 / ISO 8601 timestamp string (with explicit timezone offset)
+to a JavaScript millisecond timestamp, handling leap seconds correctly.
+
+- For ordinary timestamps, returns the same value as `new Date(timestamp).getTime()`.
+- For known leap seconds (e.g., `"2016-12-31T23:59:60Z"`), returns the
+  millisecond value for the leap second (i.e., the millisecond after
+  `23:59:59`).
+- Returns `NaN` for invalid or non-leap-second timestamps with `seconds=60`.
+- Throws `TypeError` if the input is not a string.
+
+```js
+import { toTime } from 'is-leap-second'
+
+toTime('2016-12-31T23:59:60Z') // millisecond value for the leap second
+toTime('2024-03-15T12:30:00+02:00') // same as new Date(...).getTime()
+toTime('not-a-timestamp') // NaN
+toTime(42) // throws TypeError
+```
+
+**Parameters**
+
+| Name        | Type     | Description                                                                                                                      |
+| ----------- | -------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `timestamp` | `string` | An [RFC 3339](https://www.rfc-editor.org/rfc/rfc3339) timestamp with an explicit timezone offset, e.g. `"2016-12-31T23:59:60Z"`. |
+
+**Returns** `number` — Milliseconds since the Unix epoch, or `NaN` if invalid.
+
+**Throws** `TypeError` if `timestamp` is not a string.
+
 ### `roundLeapSecond(timestamp)`
 
 Rounds a leap-second RFC 3339 timestamp down to the nearest valid instant

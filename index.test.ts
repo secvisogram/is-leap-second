@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { isLeapSecond, roundLeapSecond } from './index.js'
+import { isLeapSecond, roundLeapSecond, toTime } from './index.js'
 
 describe('isLeapSecond', () => {
   describe('known leap seconds', () => {
@@ -182,6 +182,101 @@ describe('roundLeapSecond', () => {
 
     it('throws TypeError for undefined', () => {
       assert.throws(() => roundLeapSecond(undefined as any), TypeError)
+    })
+  })
+})
+
+describe('toTime', () => {
+  describe('known leap seconds', () => {
+    it('returns the leap-second millisecond value for a UTC leap second', () => {
+      assert.equal(
+        toTime('2016-12-31T23:59:60Z'),
+        new Date('2016-12-31T23:59:59Z').getTime() + 1000,
+      )
+    })
+
+    it('returns the leap-second value for a positive-offset timestamp (+01:00)', () => {
+      // 2017-01-01T00:59:60+01:00 == 2016-12-31T23:59:60Z
+      assert.equal(
+        toTime('2017-01-01T00:59:60+01:00'),
+        new Date('2016-12-31T23:59:59Z').getTime() + 1000,
+      )
+    })
+
+    it('returns the leap-second value for a negative-offset timestamp (-05:00)', () => {
+      // 2016-12-31T18:59:60-05:00 == 2016-12-31T23:59:60Z
+      assert.equal(
+        toTime('2016-12-31T18:59:60-05:00'),
+        new Date('2016-12-31T23:59:59Z').getTime() + 1000,
+      )
+    })
+
+    it('ignores fractional seconds and returns the leap-second value', () => {
+      assert.equal(
+        toTime('2016-12-31T23:59:60.5Z'),
+        new Date('2016-12-31T23:59:59Z').getTime() + 1000,
+      )
+    })
+
+    it('returns the leap-second value for the first ever leap second (1972-06-30)', () => {
+      assert.equal(
+        toTime('1972-06-30T23:59:60Z'),
+        new Date('1972-06-30T23:59:59Z').getTime() + 1000,
+      )
+    })
+
+    it('returns the leap-second value for a large positive offset shifting UTC date back (+05:30)', () => {
+      // 2012-07-01T05:29:60+05:30 == 2012-06-30T23:59:60Z
+      assert.equal(
+        toTime('2012-07-01T05:29:60+05:30'),
+        new Date('2012-06-30T23:59:59Z').getTime() + 1000,
+      )
+    })
+  })
+
+  describe('ordinary timestamps', () => {
+    it('returns the same value as new Date().getTime() for a regular UTC timestamp', () => {
+      assert.equal(
+        toTime('2016-12-31T23:59:59Z'),
+        new Date('2016-12-31T23:59:59Z').getTime(),
+      )
+    })
+
+    it('returns the same value as new Date().getTime() for a timestamp with a non-zero offset', () => {
+      assert.equal(
+        toTime('2024-03-15T12:30:00+02:00'),
+        new Date('2024-03-15T12:30:00+02:00').getTime(),
+      )
+    })
+  })
+
+  describe('seconds=60 pass-through (not a known leap second)', () => {
+    it('returns NaN for a non-leap-second date with seconds=60 at correct UTC time', () => {
+      // 2020-06-30 is not a leap second date; Date cannot parse :60
+      assert.ok(Number.isNaN(toTime('2020-06-30T23:59:60Z')))
+    })
+
+    it('returns NaN for seconds=60 at a wrong UTC minute', () => {
+      // seconds=60 but UTC time is 22:59, not 23:59 — not a leap second candidate
+      assert.ok(Number.isNaN(toTime('2016-12-31T22:59:60Z')))
+    })
+  })
+
+  describe('invalid input', () => {
+    it('returns NaN for a string that does not match RFC 3339', () => {
+      assert.ok(Number.isNaN(toTime('not-a-timestamp')))
+    })
+
+    it('throws TypeError for a number', () => {
+      assert.throws(() => toTime(42 as any), TypeError)
+    })
+
+    it('throws TypeError for null', () => {
+      assert.throws(() => toTime(null as any), TypeError)
+    })
+
+    it('throws TypeError for undefined', () => {
+      assert.throws(() => toTime(undefined as any), TypeError)
     })
   })
 })

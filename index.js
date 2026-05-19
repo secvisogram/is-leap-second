@@ -38,6 +38,39 @@ export function isLeapSecond(timestamp) {
 }
 
 /**
+ * Converts an RFC 3339 timestamp to a Unix millisecond timestamp.
+ *
+ * For ordinary timestamps the value is equivalent to `new
+ * Date(timestamp).getTime()`.
+ *
+ * For a known leap-second timestamp (seconds field `60` and a UTC-normalised
+ * time of `23:59`), the function returns the millisecond value of the leap
+ * second itself: `<UTC-date>T23:59:59Z` + 1 000 ms.  This places the leap
+ * second one second after the last regular second of the minute, making it
+ * possible to order or compare leap-second instants on the Unix timeline.
+ *
+ * If the timestamp has seconds field `60` but does not match a known historical
+ * leap second, it is passed through to `Date` as-is.
+ *
+ * @param {string} timestamp - An RFC 3339 / ISO 8601 timestamp with explicit
+ *   timezone offset (e.g. `"2016-12-31T23:59:60Z"`).
+ * @returns {number} - Unix millisecond timestamp for the given instant.
+ * @throws {TypeError} - If `timestamp` is not a string.
+ */
+export function toTime(timestamp) {
+  if (typeof timestamp !== 'string') {
+    throw new TypeError(`Expected a string, got ${typeof timestamp}`)
+  }
+
+  if (!RFC3339_RE.test(timestamp)) return NaN
+
+  const utcDate = parseLeapSecond(timestamp)
+  return utcDate === null || !leapSeconds.has(utcDate)
+    ? new Date(timestamp).getTime()
+    : new Date(`${utcDate}T23:59:59Z`).getTime() + 1000
+}
+
+/**
  * Rounds a leap-second RFC 3339 timestamp down to the nearest valid instant
  * accepted by the Temporal API.
  *
