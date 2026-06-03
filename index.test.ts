@@ -187,11 +187,29 @@ describe('roundLeapSecond', () => {
 })
 
 describe('toTime', () => {
+  function expectedNs(
+    year: number,
+    month: number,
+    day: number,
+    hour: number,
+    minute: number,
+    second: number,
+    offsetMinutes: number,
+    fraction = '',
+  ): bigint {
+    const wholeMs =
+      Date.UTC(year, month - 1, day, hour, minute, second, 0) -
+      offsetMinutes * 60_000
+    const fractionalNs =
+      fraction === '' ? 0n : BigInt(fraction.padEnd(9, '0').slice(0, 9))
+    return BigInt(wholeMs) * 1_000_000n + fractionalNs
+  }
+
   describe('known leap seconds', () => {
     it('returns the leap-second millisecond value for a UTC leap second', () => {
       assert.equal(
         toTime('2016-12-31T23:59:60Z'),
-        new Date('2016-12-31T23:59:59Z').getTime() + 1000,
+        BigInt(new Date('2016-12-31T23:59:59Z').getTime() + 1000) * 1_000_000n,
       )
     })
 
@@ -199,7 +217,7 @@ describe('toTime', () => {
       // 2017-01-01T00:59:60+01:00 == 2016-12-31T23:59:60Z
       assert.equal(
         toTime('2017-01-01T00:59:60+01:00'),
-        new Date('2016-12-31T23:59:59Z').getTime() + 1000,
+        BigInt(new Date('2016-12-31T23:59:59Z').getTime() + 1000) * 1_000_000n,
       )
     })
 
@@ -207,21 +225,28 @@ describe('toTime', () => {
       // 2016-12-31T18:59:60-05:00 == 2016-12-31T23:59:60Z
       assert.equal(
         toTime('2016-12-31T18:59:60-05:00'),
-        new Date('2016-12-31T23:59:59Z').getTime() + 1000,
+        BigInt(new Date('2016-12-31T23:59:59Z').getTime() + 1000) * 1_000_000n,
       )
     })
 
     it('ignores fractional seconds and returns the leap-second value', () => {
       assert.equal(
         toTime('2016-12-31T23:59:60.5Z'),
-        new Date('2016-12-31T23:59:59Z').getTime() + 1000,
+        BigInt(new Date('2016-12-31T23:59:59Z').getTime() + 1000) * 1_000_000n,
+      )
+    })
+
+    it('ignores high-precision fractional seconds and returns the leap-second value', () => {
+      assert.equal(
+        toTime('2016-12-31T23:59:60.123456789Z'),
+        BigInt(new Date('2016-12-31T23:59:59Z').getTime() + 1000) * 1_000_000n,
       )
     })
 
     it('returns the leap-second value for the first ever leap second (1972-06-30)', () => {
       assert.equal(
         toTime('1972-06-30T23:59:60Z'),
-        new Date('1972-06-30T23:59:59Z').getTime() + 1000,
+        BigInt(new Date('1972-06-30T23:59:59Z').getTime() + 1000) * 1_000_000n,
       )
     })
 
@@ -229,7 +254,7 @@ describe('toTime', () => {
       // 2012-07-01T05:29:60+05:30 == 2012-06-30T23:59:60Z
       assert.equal(
         toTime('2012-07-01T05:29:60+05:30'),
-        new Date('2012-06-30T23:59:59Z').getTime() + 1000,
+        BigInt(new Date('2012-06-30T23:59:59Z').getTime() + 1000) * 1_000_000n,
       )
     })
   })
@@ -238,33 +263,49 @@ describe('toTime', () => {
     it('returns the same value as new Date().getTime() for a regular UTC timestamp', () => {
       assert.equal(
         toTime('2016-12-31T23:59:59Z'),
-        new Date('2016-12-31T23:59:59Z').getTime(),
+        BigInt(new Date('2016-12-31T23:59:59Z').getTime()) * 1_000_000n,
       )
     })
 
     it('returns the same value as new Date().getTime() for a timestamp with a non-zero offset', () => {
       assert.equal(
         toTime('2024-03-15T12:30:00+02:00'),
-        new Date('2024-03-15T12:30:00+02:00').getTime(),
+        BigInt(new Date('2024-03-15T12:30:00+02:00').getTime()) * 1_000_000n,
       )
+    })
+
+    it('preserves high-precision fractional seconds in UTC timestamps', () => {
+      const actual = toTime('2024-03-15T12:30:00.123456Z')
+      const expected = expectedNs(2024, 3, 15, 12, 30, 0, 0, '123456')
+      assert.equal(actual, expected)
+    })
+
+    it('preserves high-precision fractional seconds with positive offsets', () => {
+      const actual = toTime('2024-03-15T12:30:00.123456789+02:00')
+      const expected = expectedNs(2024, 3, 15, 12, 30, 0, 120, '123456789')
+      assert.equal(actual, expected)
+    })
+
+    it('preserves high-precision fractional seconds with negative offsets', () => {
+      const actual = toTime('2024-03-15T12:30:00.123456789-05:00')
+      const expected = expectedNs(2024, 3, 15, 12, 30, 0, -300, '123456789')
+      assert.equal(actual, expected)
     })
   })
 
   describe('seconds=60 pass-through (not a known leap second)', () => {
-    it('returns NaN for a non-leap-second date with seconds=60 at correct UTC time', () => {
-      // 2020-06-30 is not a leap second date; Date cannot parse :60
-      assert.ok(Number.isNaN(toTime('2020-06-30T23:59:60Z')))
+    it('returns null for a non-leap-second date with seconds=60 at correct UTC time', () => {
+      assert.equal(toTime('2020-06-30T23:59:60Z'), null)
     })
 
-    it('returns NaN for seconds=60 at a wrong UTC minute', () => {
-      // seconds=60 but UTC time is 22:59, not 23:59 — not a leap second candidate
-      assert.ok(Number.isNaN(toTime('2016-12-31T22:59:60Z')))
+    it('returns null for seconds=60 at a wrong UTC minute', () => {
+      assert.equal(toTime('2016-12-31T22:59:60Z'), null)
     })
   })
 
   describe('invalid input', () => {
-    it('returns NaN for a string that does not match RFC 3339', () => {
-      assert.ok(Number.isNaN(toTime('not-a-timestamp')))
+    it('returns null for a string that does not match RFC 3339', () => {
+      assert.equal(toTime('not-a-timestamp'), null)
     })
 
     it('throws TypeError for a number', () => {

@@ -4,12 +4,13 @@ import { leapSeconds } from './lib/leapSeconds.js'
  * RFC 3339 regex capturing:
  *   [1] year, [2] month, [3] day,
  *   [4] hour, [5] minute, [6] second  (integer part only),
- *   [7] timezone  ("Z" | "+HH:MM" | "-HH:MM")
+ *   [7] fractional second digits (optional),
+ *   [8] timezone  ("Z" | "+HH:MM" | "-HH:MM")
  *
  * See: https://datatracker.ietf.org/doc/html/rfc3339#section-5.6
  */
 const RFC3339_RE =
-  /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(Z|[+-]\d{2}:\d{2})$/i
+  /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?(Z|[+-]\d{2}:\d{2})$/i
 
 /**
  * Checks whether an RFC 3339 timestamp represents a leap second.
@@ -38,23 +39,26 @@ export function isLeapSecond(timestamp) {
 }
 
 /**
- * Converts an RFC 3339 timestamp to a Unix millisecond timestamp.
+ * Converts an RFC 3339 timestamp to a unix nanosecond timestamp.
  *
- * For ordinary timestamps the value is equivalent to `new
- * Date(timestamp).getTime()`.
+ * For ordinary timestamps the value is equivalent to
+ * `new Date(timestamp).getTime() * 1_000_000`, except that fractional seconds
+ * are preserved up to nanosecond precision in the returned `bigint`.
  *
  * For a known leap-second timestamp (seconds field `60` and a UTC-normalised
  * time of `23:59`), the function returns the millisecond value of the leap
- * second itself: `<UTC-date>T23:59:59Z` + 1 000 ms.  This places the leap
- * second one second after the last regular second of the minute, making it
- * possible to order or compare leap-second instants on the Unix timeline.
+ * second itself: `<UTC-date>T23:59:59Z` + 1 000 ms (in nanosecond units).
+ * This places the leap second one second after the last regular second of the
+ * minute, making it possible to order or compare leap-second instants on the
+ * Unix timeline.
  *
- * If the timestamp has seconds field `60` but does not match a known historical
- * leap second, it is passed through to `Date` as-is.
+ * If the timestamp cannot be parsed as RFC 3339, or has seconds field `60`
+ * without matching a known historical leap second, the function returns `null`.
  *
  * @param {string} timestamp - An RFC 3339 / ISO 8601 timestamp with explicit
  *   timezone offset (e.g. `"2016-12-31T23:59:60Z"`).
- * @returns {number} - Unix millisecond timestamp for the given instant.
+ * @returns {bigint | null} - Unix nanosecond timestamp for the given instant,
+ *   or `null` for invalid input.
  * @throws {TypeError} - If `timestamp` is not a string.
  */
 export function toTime(timestamp) {
@@ -62,12 +66,34 @@ export function toTime(timestamp) {
     throw new TypeError(`Expected a string, got ${typeof timestamp}`)
   }
 
-  if (!RFC3339_RE.test(timestamp)) return NaN
+  const match = RFC3339_RE.exec(timestamp)
+  if (!match) return null
 
-  const utcDate = parseLeapSecond(timestamp)
-  return utcDate === null || !leapSeconds.has(utcDate)
-    ? new Date(timestamp).getTime()
-    : new Date(`${utcDate}T23:59:59Z`).getTime() + 1000
+  const seconds = Number(match[6])
+  const fraction = String(match[7] ?? '')
+
+  if (seconds === 60) {
+    const utcDate = parseLeapSecond(timestamp)
+    return utcDate === null || !leapSeconds.has(utcDate)
+      ? null
+      : BigInt(new Date(`${utcDate}T23:59:59Z`).getTime() + 1000) * 1_000_000n
+  }
+
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  const hour = Number(match[4])
+  const minute = Number(match[5])
+  const tz = String(match[8])
+
+  const wholeMs =
+    Date.UTC(year, month - 1, day, hour, minute, seconds, 0) -
+    tzOffsetMinutes(tz) * 60_000
+
+  // Keep at most 9 fractional digits (nanosecond precision) and pad shorter fractions.
+  const fractionalNs =
+    fraction === '' ? 0n : BigInt(fraction.padEnd(9, '0').slice(0, 9))
+  return BigInt(wholeMs) * 1_000_000n + fractionalNs
 }
 
 /**
@@ -117,7 +143,7 @@ function parseLeapSecond(timestamp) {
   const day = Number(match[3])
   const hour = Number(match[4])
   const minute = Number(match[5])
-  const tz = String(match[7])
+  const tz = String(match[8])
 
   // Convert local HH:MM to UTC total minutes
   const localMinutes = hour * 60 + minute
