@@ -138,6 +138,62 @@ latest data from the IANA time zone database and regenerate `lib/leapSeconds.js`
 npm run update-leap-seconds
 ```
 
+## Contributing
+
+### Source language
+
+Package sources (`index.js`, `lib/`) are plain JavaScript with
+[JSDoc](https://jsdoc.app/) type annotations. No compilation step is needed
+before publishing — what you author is what gets distributed.
+
+The key benefit of this approach is that the package can be linked directly into
+other projects with `npm link` without releasing a new version first. This makes
+it practical to test new features end-to-end in a consuming project before
+committing to a release.
+
+The test suite (`index.test.ts`) and maintenance scripts (`scripts/update.ts`)
+are dev-only and never published, so they use real TypeScript syntax.
+
+### Type-checking and declaration files
+
+TypeScript checks the JavaScript sources via `checkJs: true` and emits
+declaration files to `dist/` with `emitDeclarationOnly: true`. No `.js` output
+is produced. The `prepublishOnly` script in `package.json` runs this
+automatically before every `npm publish`, but you can also run it manually to
+verify types:
+
+```sh
+tsc -b tsconfig.src.json
+```
+
+### Advanced TypeScript types
+
+JSDoc cannot express every TypeScript feature (e.g. mapped types, template
+literal types). When you need them, define the types in a dedicated `.ts`
+type-only file and import them into JSDoc annotations via `@import` or
+`@typedef {import('./types.js').MyType} MyType`. This keeps the distributed
+files as plain JavaScript while still supporting the full TypeScript type system.
+
+### Test runner
+
+The test suite uses the Node.js built-in test runner (`node:test`) together with
+the built-in assertion library (`node:assert/strict`). No third-party test
+framework is installed.
+
+Run the tests with coverage:
+
+```sh
+npm test
+```
+
+This executes `c8 node --test`, collecting coverage in the same step without a
+separate runner invocation. The familiar `describe` / `it` API is used throughout
+— the style will be recognisable to developers coming from Jest or Mocha.
+
+Because `node:test` is part of Node.js itself, there is no test-framework
+dependency to install, update, or audit. The minimum required Node.js version is
+**20**, where `node:test` became stable.
+
 ## License
 
 [Apache-2.0](LICENSE)
