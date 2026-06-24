@@ -18,6 +18,27 @@
     "prepublishOnly": "tsc -b tsconfig.src.json"
   },
   "license": "Apache-2.0",
+  "keywords": [
+    "leap-second",
+    "leap second",
+    "rfc3339",
+    "RFC 3339",
+    "timestamp",
+    "time",
+    "date",
+    "UTC"
+  ],
+  "homepage": "https://github.com/secvisogram/is-leap-second#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/secvisogram/is-leap-second.git"
+  },
+  "bugs": {
+    "url": "https://github.com/secvisogram/is-leap-second/issues"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "devDependencies": {
     "@types/node": "^25.7.0",
     "c8": "^11.0.0",

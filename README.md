@@ -5,7 +5,7 @@ Provides a basic check whether an RFC 3339 timestamp is a leap second.
 ## Installation
 
 ```sh
-npm install is-leap-second
+npm install @secvisogram/is-leap-second
 ```
 
 ## Usage
