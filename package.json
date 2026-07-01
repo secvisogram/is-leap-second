@@ -1,6 +1,6 @@
 {
   "name": "@secvisogram/is-leap-second",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Provides a basic check whether an RFC 3339 timestamp is a leap second",
   "type": "module",
   "files": [
